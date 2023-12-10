@@ -68,7 +68,7 @@ with open(outPath, 'w') as writer:
 
         isl = raw[i,"Is Laundering"]
 
-        line = '%d,%d,%d,%d,%f,%d,%f,%d,%d,%d\n' % \
+        line = '%d,%s,%s,%d,%s,%s,%s,%s,%s,%s\n' % \
                     (i,fromId,toId,ts,amountPaidOrig,cur2, amountReceivedOrig,cur1,fmt,isl)
 
         writer.write(line)

@@ -1,6 +1,6 @@
 import torch
 import tqdm
-from sklearn.metrics import f1_score
+from sklearn.metrics import f1_score,precision_score,recall_score
 from train_util import AddEgoIds, extract_param, add_arange_ids, get_loaders, evaluate_homo, evaluate_hetero
 from models import GINe, PNA, GATe, RGCN
 from torch_geometric.data import Data, HeteroData
@@ -11,7 +11,6 @@ import logging
 
 def train_homo(tr_loader, val_loader, te_loader, tr_inds, val_inds, te_inds, model, optimizer, loss_fn, args, config, device, val_data, te_data):
     #training
-    best_val_f1 = 0
     for epoch in range(config.epochs):
         total_loss = total_examples = 0
         preds = []
@@ -43,30 +42,60 @@ def train_homo(tr_loader, val_loader, te_loader, tr_inds, val_inds, te_inds, mod
 
         pred = torch.cat(preds, dim=0).detach().cpu().numpy()
         ground_truth = torch.cat(ground_truths, dim=0).detach().cpu().numpy()
-        f1 = f1_score(ground_truth, pred)
-        wandb.log({"f1/train": f1}, step=epoch)
-        logging.info(f'Train F1: {f1:.4f}')
 
-        #evaluate
-        val_f1 = evaluate_homo(val_loader, val_inds, model, val_data, device, args)
-        te_f1 = evaluate_homo(te_loader, te_inds, model, te_data, device, args)
-
-        wandb.log({"f1/validation": val_f1}, step=epoch)
-        wandb.log({"f1/test": te_f1}, step=epoch)
-        logging.info(f'Validation F1: {val_f1:.4f}')
-        logging.info(f'Test F1: {te_f1:.4f}')
-
-        if epoch == 0:
-            wandb.log({"best_test_f1": te_f1}, step=epoch)
-        elif val_f1 > best_val_f1:
-            best_val_f1 = val_f1
-            wandb.log({"best_test_f1": te_f1}, step=epoch)
-    
+        print_performance(args, device, epoch, ground_truth, model, pred, te_data, te_inds, te_loader, val_data,
+                          val_inds, val_loader)
     return model
+
+
+def print_performance(args, device, epoch, ground_truth, model, pred, te_data, te_inds, te_loader, val_data, val_inds,
+                      val_loader):
+    best_val_f1 = 0
+    best_val_precision = 0
+    best_val_recall = 0
+    f1 = f1_score(ground_truth, pred)
+    wandb.log({"f1/train": f1}, step=epoch)
+    logging.info(f'Train F1: {f1:.4f}')
+    precision = precision_score(ground_truth, pred)
+    wandb.log({"recall_score/train": precision}, step=epoch)
+    logging.info(f'Train recall_score: {precision:.4f}')
+    recall = recall_score(ground_truth, pred)
+    wandb.log({"precision_score/train": recall}, step=epoch)
+    logging.info(f'Train precision_score: {recall:.4f}')
+    # evaluate
+    val_f1, val_precision, val_recall = evaluate_homo(val_loader, val_inds, model, val_data, device, args)
+    te_f1, te_precision, te_recall = evaluate_homo(te_loader, te_inds, model, te_data, device, args)
+    wandb.log({"f1/validation": val_f1}, step=epoch)
+    wandb.log({"f1/test": te_f1}, step=epoch)
+    logging.info(f'Validation F1: {val_f1:.4f}')
+    logging.info(f'Test F1: {te_f1:.4f}')
+    wandb.log({"precision/validation": val_precision}, step=epoch)
+    wandb.log({"precision/test": te_precision}, step=epoch)
+    logging.info(f'Validation precision: {val_precision:.4f}')
+    logging.info(f'Test precision: {te_precision:.4f}')
+    wandb.log({"recall/validation": val_recall}, step=epoch)
+    wandb.log({"recall/test": te_recall}, step=epoch)
+    logging.info(f'Validation recall: {val_recall:.4f}')
+    logging.info(f'Test recall: {te_recall:.4f}')
+    if epoch == 0:
+        wandb.log({"best_test_f1": te_f1}, step=epoch)
+    elif val_f1 > best_val_f1:
+        best_val_f1 = val_f1
+        wandb.log({"best_test_f1": te_f1}, step=epoch)
+    if epoch == 0:
+        wandb.log({"best_test_precision": te_precision}, step=epoch)
+    elif val_precision > best_val_precision:
+        best_val_precision = val_precision
+        wandb.log({"best_test_precision": te_precision}, step=epoch)
+    if epoch == 0:
+        wandb.log({"best_test_recall": te_recall}, step=epoch)
+    elif val_recall > best_val_recall:
+        best_val_recall = val_recall
+        wandb.log({"best_test_recall": te_recall}, step=epoch)
+
 
 def train_hetero(tr_loader, val_loader, te_loader, tr_inds, val_inds, te_inds, model, optimizer, loss_fn, args, config, device, val_data, te_data):
     #training
-    best_val_f1 = 0
     for epoch in range(config.epochs):
         total_loss = total_examples = 0
         preds = []
@@ -100,25 +129,9 @@ def train_hetero(tr_loader, val_loader, te_loader, tr_inds, val_inds, te_inds, m
             
         pred = torch.cat(preds, dim=0).detach().cpu().numpy()
         ground_truth = torch.cat(ground_truths, dim=0).detach().cpu().numpy()
-        f1 = f1_score(ground_truth, pred)
-        wandb.log({"f1/train": f1}, step=epoch)
-        logging.info(f'Train F1: {f1:.4f}')
 
-        #evaluate
-        val_f1 = evaluate_hetero(val_loader, val_inds, model, val_data, device, args)
-        te_f1 = evaluate_hetero(te_loader, te_inds, model, te_data, device, args)
-
-        wandb.log({"f1/validation": val_f1}, step=epoch)
-        wandb.log({"f1/test": te_f1}, step=epoch)
-        logging.info(f'Validation F1: {val_f1:.4f}')
-        logging.info(f'Test F1: {te_f1:.4f}')
-
-        if epoch == 0:
-            wandb.log({"best_test_f1": te_f1}, step=epoch)
-        elif val_f1 > best_val_f1:
-            best_val_f1 = val_f1
-            wandb.log({"best_test_f1": te_f1}, step=epoch)
-        
+        print_performance(args, device, epoch, ground_truth, model, pred, te_data, te_inds, te_loader, val_data,
+                          val_inds, val_loader)
     return model
 
 def get_model(sample_batch, config, args):
@@ -166,7 +179,7 @@ def train_gnn(tr_data, val_data, te_data, tr_inds, val_inds, te_inds, args):
     #define a model config dictionary and wandb logging at the same time
     wandb.init(
         mode="disabled" if args.testing else "online",
-        project="your_proj_name", #replace this with your wandb project name if you want to use wandb logging
+        project="GNN_AML", #replace this with your wandb project name if you want to use wandb logging
 
         config={
             "epochs": args.n_epochs,

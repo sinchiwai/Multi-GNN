@@ -8,14 +8,15 @@ from data_util import GraphData, HeteroData, z_norm, create_hetero_obj
 def get_data(args):
     '''This function is used to get the AML data in a graph format ready to be used for GNN training.'''
 
-    transaction_file = f"/path_to_data/{args.data}/transactions.csv" #replace this with your path to the respective AML data objects
+    transaction_file = f"F:\data\\formatted_transactions.csv" #replace this with your path to the respective AML data objects
     df_edges = pd.read_csv(transaction_file)
 
     logging.info(f'Available Edge Features: {df_edges.columns.tolist()}')
+    logging.info(f'df_edges.columns: {df_edges.columns}')
 
     df_edges['Timestamp'] = df_edges['Timestamp'] - df_edges['Timestamp'].min()
 
-    max_n_id = df_edges.loc[:, ['from_id', 'to_id']].to_numpy().max() + 1
+    max_n_id = df_edges.loc[:, ['SourceAccountId', 'TargetAccountId']].to_numpy().max() + 1
     df_nodes = pd.DataFrame({'NodeID': np.arange(max_n_id), 'Feature': np.ones(max_n_id)})
     timestamps = torch.Tensor(df_edges['Timestamp'].to_numpy())
     y = torch.LongTensor(df_edges['Is Laundering'].to_numpy())
@@ -24,14 +25,14 @@ def get_data(args):
     logging.info(f"Number of nodes (holdings doing transcations) = {df_nodes.shape[0]}")
     logging.info(f"Number of transactions = {df_edges.shape[0]}")
 
-    edge_features = ['Timestamp', 'Amount Received', 'Received Currency', 'Payment Format']
+    edge_features = ['Timestamp', 'Amount Received', 'Receiving Currency', 'Payment Format']
     node_features = ['Feature']
 
     logging.info(f'Edge features being used: {edge_features}')
     logging.info(f'Node features being used: {node_features} ("Feature" is a placeholder feature of all 1s)')
 
     x = torch.tensor(df_nodes.loc[:, node_features].to_numpy()).float()
-    edge_index = torch.LongTensor(df_edges.loc[:, ['from_id', 'to_id']].to_numpy().T)
+    edge_index = torch.LongTensor(df_edges.loc[:, ['SourceAccountId', 'TargetAccountId']].to_numpy().T)
     edge_attr = torch.tensor(df_edges.loc[:, edge_features].to_numpy()).float()
 
     n_days = int(timestamps.max() / (3600 * 24) + 1)
